@@ -70,4 +70,15 @@ private:
     // Your buckets, your element count, and any private helpers you want
     // (for example a rehash function). Store std::unique_ptr<Tool> in the
     // buckets so that pointers handed out by find() survive a resize.
+    using Bucket = std::vector<std::unique_ptr<Tool>>;
+
+    static constexpr std::size_t kInitialBuckets = 16;
+    static constexpr double kMaxLoad = 0.75;
+
+    std::size_t index_for(std::string_view key, std::size_t buckets) const noexcept;
+    void  rehash(std::size_t new_bucket_count);
+
+    std::vector<Bucket> buckets_;
+    std::size_t        size_ = 0;
+
 };

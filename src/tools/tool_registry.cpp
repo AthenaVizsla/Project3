@@ -20,8 +20,23 @@ std::size_t ToolRegistry::hash(std::string_view key) noexcept {
     return static_cast<std::size_t>(h);   
 }
 
-bool ToolRegistry::add(std::unique_ptr<Tool> /*tool*/) {
-    return false;   // TODO
+std::size_t ToolRegistry::index_for(std::string_view key, std::size_t buckets) const noexcept{
+    return hash(key) & (buckets - 1);
+}
+
+bool ToolRegistry::add(std::unique_ptr<Tool> tool) {
+    if (tool == nullptr) return false;
+
+    const std::string name = tool->name();
+    if (find(name) != nullptr) return false;
+
+    if (static_cast<double>(size_ + 1) > kMaxLoad * static_cast<double>(buckets_.size())){
+        rehash(buckets_.size() * 2);
+    }
+
+    buckets_[index_for(name, buckets_.size())].push_back(std::move(tool));
+    ++size_;
+    return true;   
 }
 
 Tool* ToolRegistry::find(std::string_view /*name*/) const {
@@ -29,7 +44,7 @@ Tool* ToolRegistry::find(std::string_view /*name*/) const {
 }
 
 std::size_t ToolRegistry::size() const noexcept {
-    return 0;   // TODO
+    return size_;   // TODO
 }
 
 void ToolRegistry::for_each(const std::function<void(const Tool&)>& /*fn*/) const {
