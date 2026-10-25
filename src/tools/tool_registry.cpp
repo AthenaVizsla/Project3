@@ -5,11 +5,19 @@
 
 #include "tools/tool_registry.h"
 
-ToolRegistry::ToolRegistry() = default;    // TODO: create your initial buckets
+#include <cstdint>
+#include <utility>
+
+ToolRegistry::ToolRegistry() : buckets_(kInitialBuckets), size_(0){}
 ToolRegistry::~ToolRegistry() = default;   // unique_ptrs in your buckets free the tools
 
-std::size_t ToolRegistry::hash(std::string_view /*key*/) noexcept {
-    return 0;   // TODO: FNV-1a (spec Appendix A) or another real string hash
+std::size_t ToolRegistry::hash(std::string_view key) noexcept {
+    std::uint64_t h = 1469598103934665603ULL;
+    for (unsigned char c : key){
+        h ^= c;
+        h *= 1099511628211ULL;
+    }
+    return static_cast<std::size_t>(h);   
 }
 
 bool ToolRegistry::add(std::unique_ptr<Tool> /*tool*/) {
