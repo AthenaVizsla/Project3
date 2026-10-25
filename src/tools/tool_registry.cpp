@@ -24,6 +24,17 @@ std::size_t ToolRegistry::index_for(std::string_view key, std::size_t buckets) c
     return hash(key) & (buckets - 1);
 }
 
+void ToolRegistry::rehash(std::size_t new_bucket_count){
+    std::vector<Bucket> fresh(new_bucket_count);
+    for (Bucket& b : buckets_){
+        for (std::unique_ptr<Tool>& t : b){
+            std::size_t  idx = index_for(t->name(), new_bucket_count);
+            fresh[idx].push_back(std::move(t));
+        }
+    }
+    buckets_ = std::move(fresh);
+}
+
 bool ToolRegistry::add(std::unique_ptr<Tool> tool) {
     if (tool == nullptr) return false;
 
@@ -39,26 +50,38 @@ bool ToolRegistry::add(std::unique_ptr<Tool> tool) {
     return true;   
 }
 
-Tool* ToolRegistry::find(std::string_view /*name*/) const {
-    return nullptr;   // TODO
+Tool* ToolRegistry::find(std::string_view name) const {
+    const Bucket& b = buckets_[index_for(name, buckets_.size())];
+    for (const std::unique_ptr<Tool>& t : b){
+        if (t->name() == name) return t.get();
+    }
+    return nullptr;   
 }
 
 std::size_t ToolRegistry::size() const noexcept {
-    return size_;   // TODO
+    return size_;   
 }
 
-void ToolRegistry::for_each(const std::function<void(const Tool&)>& /*fn*/) const {
-    // TODO
+void ToolRegistry::for_each(const std::function<void(const Tool&)>& fn) const {
+    for (const Bucket& b : buckets_){
+        for (const std::unique_ptr<Tool>& t : b){
+            fn(*t);
+        }
+    }
 }
 
 std::size_t ToolRegistry::bucket_count() const noexcept {
-    return 0;   // TODO
+    return buckets_.size();   
 }
 
 double ToolRegistry::load_factor() const noexcept {
-    return 0.0;   // TODO
+    return static_cast<double>(size_) / static_cast<double>(buckets_.size());
 }
 
 std::size_t ToolRegistry::max_probe_length() const {
-    return 0;   // TODO
+    std::size_t longest = 0;
+    for (const Bucket& b : buckets_){
+        if (b.size() > longest) longest = b.size();
+    }
+    return longest; 
 }
