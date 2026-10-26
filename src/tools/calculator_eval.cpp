@@ -62,8 +62,60 @@ namespace {
 }
 
 
-bool calc_evaluate(const std::vector<CalcToken>& /*tokens*/, double* /*out*/,
+
+bool calc_evaluate(const std::vector<CalcToken>& tokens, double* out,
                    std::string* error) {
-    *error = "calc_evaluate not implemented yet";   // TODO
-    return false;
+    std::stack<double> values;
+    std::stack<Kind> ops;
+
+    for (const CalcToken& t : tokens){
+        if (t.kind == Kind::Number){
+            values.push(t.value);
+        }
+        else if (t.kind == Kind::LParen){
+            ops.push(Kind::LParen);
+        }
+        else if (t.kind == Kind::RParen){
+            while (!ops.empty() && ops.top() != Kind::LParen){
+                if (!apply_top(values, ops, error)){
+                    return false;
+                }
+            }
+            if (ops.empty()){
+                *error = "malformed expression: unbalanced parentheses";
+                return false;
+            }
+            ops.pop();
+        }
+        else if (is_operator(t.kind)){
+            while (!ops.empty() && is_operator(ops.top())
+             && precedence(ops.top()) >= precedence(t.kind)){
+                if(!apply_top(values, ops, error)){
+                    return false;
+                }
+            }
+            ops.push(t.kind);
+        }
+        else {
+            *error = "malformed expression";
+            return false;
+        }
+    }
+
+    while (!ops.empty()){
+        if (ops.top() == Kind::LParen){
+            *error = "malformed expression: unbalanced parentheses";
+            return false;
+        }
+        if (!apply_top(values, ops, error)){
+            return false;
+        }
+    }
+
+    if (values.size() != 1) {
+        *error = "malformed expression";
+        return false;
+    }
+    *out = values.top();
+    return true;
 }
