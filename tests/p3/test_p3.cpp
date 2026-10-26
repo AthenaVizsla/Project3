@@ -304,16 +304,84 @@ TEST(ws_resolve_does_not_touch_filesystem) {
     CHECK(!fs::exists(f.ws.root() / "made"));                // resolve created nothing
 }
 
+// calculator tests
+TEST(calc_left_to_right) {
+    double v = 0;
+    std::string err;
+    REQUIRE(eval("10 - 4 - 3", &v, &err));
+    CHECK(v == 3);
+    REQUIRE(eval("100 / 10 / 5", &v, &err));
+    CHECK(v == 2);
+}
 
+TEST(calc_parentheses) {
+    double v = 0;
+    std::string err;
+    REQUIRE(eval("(2 + 3) * 4", &v, &err));
+    CHECK(v == 20);
+    REQUIRE(eval("2 * (3 + 4) - 5", &v, &err));
+    CHECK(v == 9);
+}
 
+TEST(calc_negatives_and_decimals) {
+    double v = 0;
+    std::string err;
+    REQUIRE(eval("-3 * -3", &v, &err));
+    CHECK(v == 9);
+    REQUIRE(eval("7 / 2", &v, &err));
+    CHECK(v == 3.5);
+    REQUIRE(eval("0.5 + 0.25", &v, &err));
+    CHECK(v == 0.75);
+}
 
+TEST(calc_division_by_zero_in_parens) {
+    double v = 0;
+    std::string err;
+    CHECK(!eval("1 / (2 - 2)", &v, &err));
+    CHECK(err == "division by zero");
+}
 
+TEST(calc_own_expressions) {
+    double v = 0;
+    std::string err;
+    REQUIRE(eval("((1 + 2) * (3 + 4)) / 7 - 1", &v, &err));  // 21 / 7 - 1
+    CHECK(v == 2);
+    REQUIRE(eval("2 * 3 + 4 * 5 - 6 / 2", &v, &err));        // 6 + 20 - 3
+    CHECK(v == 23);
+    REQUIRE(eval("42", &v, &err));                           // a lone number
+    CHECK(v == 42);
+}
 
+TEST(calc_very_long_inputs) {
+    double v = 0;
+    std::string err;
+    std::string plus = "0";
+    for (int i = 0; i < 20000; ++i) plus += "+1";
+    REQUIRE(eval(plus, &v, &err));
+    CHECK(v == 20000);
 
+    std::string nested(5000, '(');
+    nested += "7";
+    nested += std::string(5000, ')');
+    REQUIRE(eval(nested, &v, &err));
+    CHECK(v == 7);
+}
 
-
-
-
+TEST(calc_survives_malformed_tokens) {
+    double v = 0;
+    std::string err;
+    CHECK(!calc_evaluate({}, &v, &err));                      // empty list
+    CHECK(!err.empty());
+    std::vector<CalcToken> bad(1);
+    bad[0].kind = CalcToken::Kind::Plus;                      // lone operator
+    err.clear();
+    CHECK(!calc_evaluate(bad, &v, &err));
+    CHECK(!err.empty());
+    bad[0].kind = CalcToken::Kind::RParen;                    // lone ')'
+    err.clear();
+    CHECK(!calc_evaluate(bad, &v, &err));
+    CHECK(!err.empty());
+}
 
 
 
