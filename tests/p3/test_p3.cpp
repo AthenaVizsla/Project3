@@ -234,7 +234,75 @@ TEST(reg_alternative_hash) {
     CHECK(weak_max > 10 * good_max);
 }
 
+////////////////////////////////// workspace
 
+namespace {
+struct WsFixture {
+    TempDir d;
+    Workspace ws{d.path()};
+    fs::path out;
+    std::string reason;
+    bool go(const std::string& p) { reason.clear(); return ws.resolve(p, &out, &reason); }
+};
+}  // namespace
+
+TEST(ws_accepts_plain_and_new_paths) {
+    WsFixture f;
+    REQUIRE(f.go("notes/todo.txt"));
+    CHECK(f.out == f.ws.root() / "notes" / "todo.txt");
+    REQUIRE(f.go("new/dir/file.txt"));                       // does not exist; still accepted
+    CHECK(f.out == f.ws.root() / "new" / "dir" / "file.txt");
+    REQUIRE(f.go("my..notes.txt"));                          // ".." inside a name is legal
+    CHECK(f.out == f.ws.root() / "my..notes.txt");
+}
+
+TEST(ws_normalizes_dots_and_slashes) {
+    WsFixture f;
+    REQUIRE(f.go("./notes//todo.txt"));
+    CHECK(f.out == f.ws.root() / "notes" / "todo.txt");
+    REQUIRE(f.go("a/../b"));
+    CHECK(f.out == f.ws.root() / "b");
+    REQUIRE(f.go("."));
+    CHECK(f.out == f.ws.root());
+    REQUIRE(f.go("a/.."));
+    CHECK(f.out == f.ws.root());
+}
+
+TEST(ws_rejects_empty_and_nul) {
+    WsFixture f;
+    CHECK(!f.go(""));
+    CHECK(!f.reason.empty());
+    CHECK(!f.go(std::string("notes") + '\0' + "/x"));
+    CHECK(!f.reason.empty());
+}
+
+TEST(ws_rejects_absolute) {
+    WsFixture f;
+    CHECK(!f.go("/etc/passwd"));
+    CHECK(!f.reason.empty());
+    // Even an absolute path that points inside the root is refused.
+    CHECK(!f.go((f.ws.root() / "notes" / "todo.txt").string()));
+    CHECK(!f.reason.empty());
+}
+
+TEST(ws_rejects_dotdot_escapes) {
+    WsFixture f;
+    for (const char* p : {"..", "../etc/passwd", "a/../../b"}) {
+        CHECK(!f.go(p));
+        CHECK(!f.reason.empty());
+    }
+    // Comes back inside the root afterwards, but still climbs out first.
+    std::string sneaky = std::string("notes/../../") + f.ws.root().filename().string() +
+                         "/notes/todo.txt";
+    CHECK(!f.go(sneaky));
+    CHECK(!f.reason.empty());
+}
+
+TEST(ws_resolve_does_not_touch_filesystem) {
+    WsFixture f;
+    REQUIRE(f.go("made/up/path.txt"));
+    CHECK(!fs::exists(f.ws.root() / "made"));                // resolve created nothing
+}
 
 
 
